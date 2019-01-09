@@ -1,8 +1,8 @@
 from functools import reduce
-import hashlib as hl
+# import hashlib as hl
 
 import json
-import pickle
+# import pickle
 import requests
 
 # Import two functions from our hash_util.py file. Omit the ".py" in the import
@@ -93,7 +93,8 @@ class Blockchain:
         try:
             with open('blockchain-{}.txt'.format(self.node_id), mode='w') as f:
                 saveable_chain = [block.__dict__ for block in [Block(block_el.index, block_el.previous_hash, [
-                    tx.__dict__ for tx in block_el.transactions], block_el.proof, block_el.timestamp) for block_el in self.__chain]]
+                    tx.__dict__ for tx in block_el.transactions], block_el.proof, block_el.timestamp) for block_el in
+                                                               self.__chain]]
                 f.write(json.dumps(saveable_chain))
                 f.write('\n')
                 saveable_tx = [tx.__dict__ for tx in self.__open_transactions]
@@ -109,7 +110,8 @@ class Blockchain:
             print('Saving failed!')
 
     def proof_of_work(self):
-        """Generate a proof of work for the open transactions, the hash of the previous block and a random number (which is guessed until it fits)."""
+        """Generate a proof of work for the open transactions,
+        the hash of the previous block and a random number (which is guessed until it fits)."""
         last_block = self.__chain[-1]
         last_hash = hash_block(last_block)
         proof = 0
@@ -121,8 +123,8 @@ class Blockchain:
     def get_balance(self, sender=None):
         """Calculate and return the balance for a participant.
         """
-        if sender == None:
-            if self.public_key == None:
+        if sender is None:
+            if self.public_key is None:
                 return None
             participant = self.public_key
         else:
@@ -139,15 +141,15 @@ class Blockchain:
                           for tx in self.__open_transactions if tx.sender == participant]
         tx_sender.append(open_tx_sender)
         print(tx_sender)
-        amount_sent = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt)
-                             if len(tx_amt) > 0 else tx_sum + 0, tx_sender, 0)
+        amount_sent = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0,
+                             tx_sender, 0)
         # This fetches received coin amounts of transactions that were already included in blocks of the blockchain
         # We ignore open transactions here because you shouldn't be able to spend
         # coins before the transaction was confirmed + included in a block
         tx_recipient = [[tx.amount for tx in block.transactions
                          if tx.recipient == participant] for block in self.__chain]
-        amount_received = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt)
-                                 if len(tx_amt) > 0 else tx_sum + 0, tx_recipient, 0)
+        amount_received = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0,
+                                 tx_recipient, 0)
         # Return the total balance
         return amount_received - amount_sent
 
@@ -185,7 +187,7 @@ class Blockchain:
                     url = 'http://{}/broadcast-transaction'.format(node)
                     try:
                         response = requests.post(url, json={
-                                                 'sender': sender, 'recipient': recipient, 'amount': amount, 'signature': signature})
+                            'sender': sender, 'recipient': recipient, 'amount': amount, 'signature': signature})
                         if response.status_code == 400 or response.status_code == 500:
                             print('Transaction declined, needs resolving')
                             return False
@@ -197,7 +199,7 @@ class Blockchain:
     def mine_block(self):
         """Create a new block and add open transactions to it."""
         # Fetch the currently last block of the blockchain
-        if self.public_key == None:
+        if self.public_key is None:
             return None
         last_block = self.__chain[-1]
         # Hash the last block (=> to be able to compare it to the stored hash value)
@@ -258,7 +260,8 @@ class Blockchain:
         # This could be improved by giving each transaction an ID that would uniquely identify it
         for itx in block['transactions']:
             for opentx in stored_transactions:
-                if opentx.sender == itx['sender'] and opentx.recipient == itx['recipient'] and opentx.amount == itx['amount'] and opentx.signature == itx['signature']:
+                if opentx.sender == itx['sender'] and opentx.recipient == itx['recipient'] and \
+                        opentx.amount == itx['amount'] and opentx.signature == itx['signature']:
                     try:
                         self.__open_transactions.remove(opentx)
                     except ValueError:
