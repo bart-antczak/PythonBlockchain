@@ -50,7 +50,6 @@ class Blockchain:
     def chain(self, val):
         self.__chain = val
 
-
     def get_open_transactions(self):
         """Returns a copy of the open transactions list."""
         return self.__open_transactions[:]
@@ -159,9 +158,20 @@ class Blockchain:
     # The optional one is optional because it has a default value => [1]
 
     def add_transaction(self, recipient, sender, signature, amount=1.0, is_receiving=False):
-        """ Append a new value as well as the last blockchain value to the blockchain. """
-        if self.public_key == None:
-            return False
+        """ Append a new value as well as the last blockchain value to the blockchain.
+
+        Arguments:
+            :sender: Tecihe sender of the coins.
+            :rpient: The recipient of the coins.
+            :amount: The amount of coins sent with the transaction (default = 1.0)
+        """
+        # transaction = {
+        #     'sender': sender,
+        #     'recipient': recipient,
+        #     'amount': amount
+        # }
+        # if self.public_key == None:
+        #     return False
         transaction = Transaction(sender, recipient, signature, amount)
         if Verification.verify_transaction(transaction, self.get_balance):
             self.__open_transactions.append(transaction)
@@ -170,10 +180,10 @@ class Blockchain:
                 for node in self.__peer_nodes:
                     url = 'http://{}/broadcast-transaction'.format(node)
                     try:
-                        response = requests.post(url, json={'sender': sender, 'recipient': recipient, 'amount': amount,
-                                                            'signature': signature})
+                        response = requests.post(url, json={
+                                                 'sender': sender, 'recipient': recipient, 'amount': amount, 'signature': signature})
                         if response.status_code == 400 or response.status_code == 500:
-                            print('Transaction declined, need resolving')
+                            print('Transaction declined, needs resolving')
                             return False
                     except requests.exceptions.ConnectionError:
                         continue
@@ -195,7 +205,8 @@ class Blockchain:
         #     'recipient': owner,
         #     'amount': MINING_REWARD
         # }
-        reward_transaction = Transaction('MINING',self.public_key, '', MINING_REWARD)
+        reward_transaction = Transaction(
+            'MINING', self.public_key, '', MINING_REWARD)
         # Copy transaction instead of manipulating the original open_transactions list
         # This ensures that if for some reason the mining should fail, we don't have the reward transaction stored in the open transactions
         copied_transactions = self.__open_transactions[:]
@@ -208,7 +219,40 @@ class Blockchain:
         self.__chain.append(block)
         self.__open_transactions = []
         self.save_data()
+        for node in self.__peer_nodes:
+            url = 'http://{}/broadcast-block'.format(node)
+            converted_block = block.__dict__.copy()
+            converted_block['transactions'] = [
+                tx.__dict__ for tx in converted_block['transactions']]
+            try:
+                response = requests.post(url, json={'block': converted_block})
+                if response.status_code == 400 or response.status_code == 500:
+                    print('Block declined, needs resolving')
+            except requests.exceptions.ConnectionError:
+                continue
         return block
+
+    def add_block(self, block):
+        transactions = [Transaction(
+            tx['sender'], tx['recipient'], tx['signature'], tx['amount']) for tx in block['transactions']]
+        proof_is_valid = Verification.valid_proof(
+            transactions[:-1], block['previous_hash'], block['proof'])
+        hashes_match = hash_block(self.chain[-1]) == block['previous_hash']
+        if not proof_is_valid or not hashes_match:
+            return False
+        converted_block = Block(
+            block['index'], block['previous_hash'], transactions, block['proof'], block['timestamp'])
+        self.__chain.append(converted_block)
+        stored_transactions = self.__open_transactions[:]
+        for itx in block['transactions']:
+            for opentx in stored_transactions:
+                if opentx.sender == itx['sender'] and opentx.recipient == itx['recipient'] and opentx.amount == itx['amount'] and opentx.signature == itx['signature']:
+                    try:
+                        self.__open_transactions.remove(opentx)
+                    except ValueError:
+                        print('Item was already removed')
+        self.save_data()
+        return True
 
     def add_peer_node(self, node):
         self.__peer_nodes.add(node)
